@@ -65,6 +65,16 @@ constrainAdj horiz vert (ctype1, i1, n1) (ctype2, i2, n2) =
         (ctype2 .== literal horiz &&& i1 + 1 .== i2 &&& n1 .== n2)
     ))
 
+constrainFirst :: CellType -> CellType -> CellState -> SBool
+constrainFirst horiz vert (ctype, i, n) =
+    (ctype .== literal Empty) ||| (ctype .== literal vert) |||
+    (ctype .== literal horiz &&& i .== literal 0)
+
+constrainLast :: CellType -> CellType -> CellState -> SBool
+constrainLast horiz vert (ctype, i, n) =
+    (ctype .== literal Empty) ||| (ctype .== literal vert) |||
+    (ctype .== literal horiz &&& i .== n - literal 1)
+
 constrainDiagonallyAdj :: CellState -> CellState -> SBool
 constrainDiagonallyAdj (ctype1, i1, n1) (ctype2, i2, n2) =
     ctype1 .== literal Empty |||
@@ -107,6 +117,19 @@ allDiagPairs grid =
             ) [0 .. width-1]
         ) [0 .. height-2]
 
+allTop :: [[a]] -> [a]
+allTop grid = grid !! 0
+
+allLeft :: [[a]] -> [a]
+allLeft grid = map (!! 0) grid
+
+allBot :: [[a]] -> [a]
+allBot grid = grid !! (length grid - 1)
+
+allRight :: [[a]] -> [a]
+allRight grid = let width = length (grid !! 0)
+                in map (!! (width - 1)) grid
+
 predicate :: BattleshipInst -> Symbolic SBool
 predicate inst = do
     let (instShipTypes, instCells, rowCounts, colCounts) = inst
@@ -131,6 +154,10 @@ predicate inst = do
         forM_ (allHorizPairs board) $ \(a, b) -> constrain $ constrainHorizontallyAdj a b
         forM_ (allVertPairs board) $ \(a, b) -> constrain $ constrainVerticallyAdj a b
         forM_ (allDiagPairs board) $ \(a, b) -> constrain $ constrainDiagonallyAdj a b
+        forM_ (allLeft board) $ \a -> constrain $ constrainFirst Horiz Vert a
+        forM_ (allTop board) $ \a -> constrain $ constrainFirst Vert Horiz a
+        forM_ (allRight board) $ \a -> constrain $ constrainLast Horiz Vert a
+        forM_ (allBot board) $ \a -> constrain $ constrainLast Vert Horiz a
 
         forM_ (zip rowCounts board) $ \(rowCount, row) ->
             constrain $ numNonemptyInRow row (fromIntegral rowCount)
