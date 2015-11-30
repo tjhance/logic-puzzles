@@ -8,6 +8,8 @@ import Data.Map (Map, (!))
 import Data.List (transpose)
 import Data.Maybe (fromJust)
 
+import Util
+
 type SudokuInst = [[Maybe Integer]]
 
 type Elem = SWord32
@@ -15,15 +17,6 @@ type Row = [Elem]
 type Board = [Row]
 
 type SudokuSoln = [[Integer]]
-
-type ConstraintAdder = WriterT [SBool] Symbolic ()
-addConstraints :: ConstraintAdder -> Symbolic SBool
-addConstraints constraintAdder = do
-    ((), bools) <- runWriterT constraintAdder
-    return $ foldl (&&&) (literal True) bools
-
-constrain :: SBool -> ConstraintAdder
-constrain x = tell [x]
 
 allPairs :: [a] -> [(a,a)]
 allPairs [] = []
