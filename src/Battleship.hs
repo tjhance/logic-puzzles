@@ -3,7 +3,7 @@
 
 module Battleship where
 
-import Data.SBV hiding (constrain)
+import Data.SBV
 import Data.Generics
 import Data.List (transpose)
 import Data.Map (Map, (!))
@@ -218,24 +218,24 @@ predicate inst = do
     addConstraints $ do
         forM_ (zip instCells board) $ \(instRow, boardRow) ->
             forM_ (zip instRow boardRow) $ \(input, cell) -> do
-                constrain $ baseCellConstraint (fromIntegral maxShipSize) cell
-                constrain $ isCellStateOkay input cell
+                addConstraint $ baseCellConstraint (fromIntegral maxShipSize) cell
+                addConstraint $ isCellStateOkay input cell
 
-        forM_ (allHorizPairs board) $ \(a, b) -> constrain $ constrainHorizontallyAdj a b
-        forM_ (allVertPairs board) $ \(a, b) -> constrain $ constrainVerticallyAdj a b
-        forM_ (allDiagPairs board) $ \(a, b) -> constrain $ constrainDiagonallyAdj a b
-        forM_ (allLeft board) $ \a -> constrain $ constrainLeftCell a
-        forM_ (allTop board) $ \a -> constrain $ constrainTopCell a
-        forM_ (allRight board) $ \a -> constrain $ constrainRightCell a
-        forM_ (allBot board) $ \a -> constrain $ constrainBotCell a
+        forM_ (allHorizPairs board) $ \(a, b) -> addConstraint $ constrainHorizontallyAdj a b
+        forM_ (allVertPairs board) $ \(a, b) -> addConstraint $ constrainVerticallyAdj a b
+        forM_ (allDiagPairs board) $ \(a, b) -> addConstraint $ constrainDiagonallyAdj a b
+        forM_ (allLeft board) $ \a -> addConstraint $ constrainLeftCell a
+        forM_ (allTop board) $ \a -> addConstraint $ constrainTopCell a
+        forM_ (allRight board) $ \a -> addConstraint $ constrainRightCell a
+        forM_ (allBot board) $ \a -> addConstraint $ constrainBotCell a
 
         forM_ (zip rowCounts board) $ \(rowCount, row) ->
-            constrain $ numNonemptyInRow row (fromIntegral rowCount)
+            addConstraint $ numNonemptyInRow row (fromIntegral rowCount)
         forM_ (zip colCounts (transpose board)) $ \(colCount, col) ->
-            constrain $ numNonemptyInRow col (fromIntegral colCount)
+            addConstraint $ numNonemptyInRow col (fromIntegral colCount)
 
         forM_ (zip [1..] instShipTypes) $ \(shipSize, numShips) ->
-            constrain $ numOfShipsIs board (fromIntegral shipSize) (fromIntegral numShips)
+            addConstraint $ numOfShipsIs board (fromIntegral shipSize) (fromIntegral numShips)
 
 -- Returns a string representation of the result
 getSolution :: BattleshipInst -> Map String CW -> String

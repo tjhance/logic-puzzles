@@ -2,6 +2,7 @@ module Main where
 
 import Sudoku
 import Battleship
+import PaintByNumbers
 
 sudokuEx :: [[Maybe Integer]]
 sudokuEx = map (map $ \c -> if c == '_' then Nothing else Just ((read [c]) - 1)) [
@@ -134,12 +135,18 @@ battleShipCharToInput 'v' = FaceUp
 battleShipCharToInput '^' = FaceDown
 battleShipCharToInput _ = error "Invalid battleship char"
 
+pbnEx1 :: PBNInst
+pbnEx1 = ([[1], [1]], [[1], [1]])
+
 main :: IO ()
 main = do
     sudoku sudokuEx
+
     battleship battleshipEx1
     battleship battleshipEx2
     battleship battleshipEx3
     battleship battleshipEx4
     battleship battleshipEx5
     battleship battleshipEx6
+
+    pbn pbnEx1

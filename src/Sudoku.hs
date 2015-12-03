@@ -2,7 +2,7 @@
 
 module Sudoku where
 
-import Data.SBV hiding (constrain)
+import Data.SBV
 import Control.Monad.Writer
 import Data.Map (Map, (!))
 import Data.List (transpose)
@@ -53,17 +53,17 @@ predicate inst = do
             forM_ (zip instRow boardRow) $ \(instCell, var) ->
                 do
                     case instCell of Nothing -> return ()
-                                     Just x -> constrain $ var .== (literal (fromIntegral x))
-                    constrain $ var .>= 0 &&& var .<= 8
+                                     Just x -> addConstraint $ var .== (literal (fromIntegral x))
+                    addConstraint $ var .>= 0 &&& var .<= 8
 
         let constraint1Through9 vars = do
                 -- for each `value`, at least one value in the {row,col,square} must be `value`
                 forM_ [0..8] $ \value ->
-                    constrain $
+                    addConstraint $
                         foldl (|||) (literal False) $ map (\var -> var .== literal value) vars
                 -- none of the values are equal
                 -- (technically redundant but I guess this will help the solver)
-                forM_ (allPairs vars) $ \(v1, v2) -> constrain $ v1 ./= v2
+                forM_ (allPairs vars) $ \(v1, v2) -> addConstraint $ v1 ./= v2
 
         forM_ board $ \row ->
             constraint1Through9 row

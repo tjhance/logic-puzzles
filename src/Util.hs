@@ -1,6 +1,6 @@
 module Util where
 
-import Data.SBV hiding (constrain)
+import Data.SBV
 import Control.Monad.Writer
 
 type ConstraintAdder = WriterT [SBool] Symbolic ()
@@ -9,5 +9,5 @@ addConstraints constraintAdder = do
     ((), bools) <- runWriterT constraintAdder
     return $ foldl (&&&) (literal True) bools
 
-constrain :: SBool -> ConstraintAdder
-constrain x = tell [x]
+addConstraint :: SBool -> ConstraintAdder
+addConstraint x = tell [x]
