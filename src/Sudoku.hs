@@ -16,8 +16,6 @@ type Elem = SWord32
 type Row = [Elem]
 type Board = [Row]
 
-type SudokuSoln = [[Integer]]
-
 allPairs :: [a] -> [(a,a)]
 allPairs [] = []
 allPairs (x:xs) = map (x,) xs ++ allPairs xs
@@ -40,8 +38,8 @@ getSquares xs =
         ) [0..2]
     ) [0..2]
 
-predicate :: SudokuInst -> Symbolic SBool
-predicate inst = do
+rules :: SudokuInst -> Symbolic SBool
+rules inst = do
     board <-
         forM [0..8] $ \x ->
             forM [0..8] $ \y ->
@@ -74,8 +72,9 @@ predicate inst = do
         forM_ (getSquares board) $ \sqr ->
             constraint1Through9 sqr
 
-getSolution :: Map String CW -> SudokuSoln
-getSolution m = map (\i ->
+getSolution :: Map String CW -> String
+getSolution m = concat $ map (++ "\n") $ map (concat . map (show . (+ 1))) $
+    map (\i ->
         map (\j ->
             fromIntegral $ (fromCW $ m ! (show i ++ "-" ++ show j) :: Word32)
         ) [0..8]
@@ -88,7 +87,7 @@ solvePuzzle prob fn = do
 
 sudoku :: SudokuInst -> IO ()
 sudoku puzzle = do
-    res <- solvePuzzle (predicate puzzle) getSolution
+    res <- solvePuzzle (rules puzzle) getSolution
     putStrLn $ (show $ length res) ++ " solution(s)"
     forM_ res $ \soln ->
-        putStrLn $ show $ map (concat . map (show . (+ 1))) soln
+        putStrLn $ soln
