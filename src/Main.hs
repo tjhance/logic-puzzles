@@ -138,6 +138,52 @@ battleShipCharToInput _ = error "Invalid battleship char"
 pbnEx1 :: PBNInst
 pbnEx1 = ([[1], [1]], [[1], [1]])
 
+-- this example is from https://en.wikipedia.org/wiki/Nonogram
+pbnEx2 :: PBNInst
+pbnEx2 = (
+    [ [3],
+      [5],
+      [3, 1],
+      [2, 1],
+      [3, 3, 4],
+      [2, 2, 7],
+      [6, 1, 1],
+      [4, 2, 2],
+      [1, 1],
+      [3, 1],
+      [6],
+      [2, 7],
+      [6, 3, 1],
+      [1, 2, 2, 1, 1],
+      [4, 1, 1, 3],
+      [4, 2, 2],
+      [3, 3, 1],
+      [3, 3],
+      [3],
+      [2, 1]
+    ], [
+      [2],
+      [1, 2],
+      [2, 3],
+      [2, 3],
+      [3, 1, 1],
+      [2, 1, 1],
+      [1, 1, 1, 2, 2],
+      [1, 1, 3, 1, 3],
+      [2, 6, 4],
+      [3, 3, 9, 1],
+      [5, 3, 2],
+      [3, 1, 2, 2],
+      [2, 1, 7],
+      [3, 3, 2],
+      [2, 4],
+      [2, 1, 2],
+      [2, 2, 1],
+      [2, 2],
+      [1],
+      [1]
+    ])
+
 main :: IO ()
 main = do
     sudoku sudokuEx
@@ -150,3 +196,4 @@ main = do
     battleship battleshipEx6
 
     pbn pbnEx1
+    pbn pbnEx2
