@@ -2,6 +2,10 @@
 
 module Sudoku where
 
+import Control.Applicative
+import Data.Attoparsec.ByteString
+import Data.Attoparsec.ByteString.Char8
+import Data.Char (ord)
 import Data.SBV
 import Control.Monad.Writer
 import Data.Map (Map, (!))
@@ -91,3 +95,23 @@ sudoku puzzle = do
     putStrLn $ (show $ length res) ++ " solution(s)"
     forM_ res $ \soln ->
         putStrLn $ soln
+
+sudokuParser :: Parser SudokuInst
+sudokuParser =
+    replicateM 9 $
+        replicateM 9 cellParser <* endOfLine
+    where
+    cellParser :: Parser (Maybe Integer)
+    cellParser =
+        (\x -> case x of
+            '1' -> Just 1
+            '2' -> Just 2
+            '3' -> Just 3
+            '4' -> Just 4
+            '5' -> Just 5
+            '6' -> Just 6
+            '7' -> Just 7
+            '8' -> Just 8
+            '9' -> Just 9
+            _ -> Nothing
+        ) <$> anyChar

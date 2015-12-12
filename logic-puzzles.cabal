@@ -58,9 +58,10 @@ executable logic-puzzles
   
   -- Other library packages from which modules are imported.
   build-depends:       base >=4.8 && <4.9
-                     , sbv >=5.5
+                     , attoparsec >=0.13
                      , containers >=0.1
                      , mtl >=2.2.1
+                     , sbv >=5.5
                      , syb >=0.6
   
   -- Directories containing source files.
