@@ -3,6 +3,8 @@ module Slitherlink where
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Writer
+import Data.Attoparsec.ByteString.Char8
+import Data.Char (ord)
 import Data.Maybe
 import Data.Map (Map, (!))
 import qualified Data.Map as Map
@@ -24,6 +26,8 @@ type SlitherlinkInst = [[Maybe Integer]]
     - For each vertex, at most one edge leaves.
     - The number of edges around a square with a number is that number.
     - The edges form a single connected cycle (difficult).
+
+    There will be two "solutions" returned for each solution: one for each orientation.
 --}
 
 pairs :: [a] -> [(a, a)]
@@ -64,6 +68,16 @@ rules inst = do
     edgeVars <- forM edgeLocs $ \e ->
         symbolic ("edge-" ++ show e)
     let edges = Map.fromList (zip edgeLocs edgeVars)
+    -- We use distances to determine if the cycle is connected.
+    -- The first edge will have a distance of 0, and then following
+    -- the cycle will increase the distance.
+    -- We will enforce the following properties, which together imply connectedness:
+    -- 1) If two edges are set, the distance for the later is strictly positive.
+    -- 2) For two set edges following each other, either the second distance is 0 or
+    --    one more than the first distance.
+    distVars <- forM edgeLocs $ \e ->
+        symbolic ("dist-" ++ show e) :: Symbolic SWord16
+    let dists = Map.fromList (zip edgeLocs distVars)
 
     addConstraints $ do
         -- An edge and its backedge cannot be set
@@ -111,6 +125,28 @@ rules inst = do
                         let vars = map (edges !) (edgesAround (r, c))
                         addConstraint $
                             sum (map (\v -> ite v 1 0) vars) .== literal n
+        -- If two edges are set, the distance for the later is strictly positive.
+        forM_ (pairs edgeLocs) $ \(e1, e2) -> do
+            let v1 = edges ! e1
+                v2 = edges ! e2
+                d1 = dists ! e1
+                d2 = dists ! e2
+            addConstraint $ (v1 &&& v2) ==> (d2 .> 0)
+        -- The distance for a set edge following another set edge is either 0 or one higher.
+        forM_ edgeLocs $ \e -> do
+            let t = snd e
+                outs = edgesOutOf t
+            forM_ outs $ \e' -> do
+                let v1 = edges ! e
+                    v2 = edges ! e'
+                    d1 = dists ! e
+                    d2 = dists ! e'
+                addConstraint $ (v1 &&& v2) ==> (d2 .== 0 ||| d2 .== d1 + 1)
+        -- If an edge is not set, its distance is -1
+        forM_ edgeLocs $ \e -> do
+            let v = edges ! e
+                d = dists ! e
+            addConstraint $ bnot v ==> d .== -1
 
 getSolution :: SlitherlinkInst -> Map String CW -> String
 getSolution inst m =
@@ -150,3 +186,19 @@ slitherlink puzzle = do
     printf "%d solution(s)\n" (length res)
     forM_ res $ \soln ->
         putStrLn soln
+
+-- Note that there needs to be an empty line to signal the end of the puzzle.
+slitherlinkParser :: Parser SlitherlinkInst
+slitherlinkParser = do
+    puz <- many $ do
+        row <- many1 cellParser
+        endOfLine
+        pure row
+    endOfLine
+    pure puz
+    where
+    cellParser :: Parser (Maybe Integer)
+    cellParser =
+        (Just . subtract 48 . toInteger . ord <$> digit)
+        <|> (char '.' *> pure Nothing)
+        <|> (char '_' *> pure Nothing)
