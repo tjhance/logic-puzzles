@@ -34,6 +34,14 @@ type SlitherlinkInst = [[Maybe Integer]]
     multiple loops is returned, we add a clause with the negation of the
     complete loops that are present. After some number of iterations, the
     solution will have only one cycle.
+
+    The current implementation is flawed in two ways:
+    1) Only one solution will be returned, even if multiple exist.
+    2) Whenever a solution with multiple cycles is returned, ALL of those cycles
+       are marked as bad. It is possible for a puzzle to have significant space
+       that is forced to be empty such that putting another cycle there would
+       follow the rest of the rules. If the two-cycle solution is returned first
+       then the correct solution will fail to be found.
 --}
 
 pairs :: [a] -> [(a, a)]
