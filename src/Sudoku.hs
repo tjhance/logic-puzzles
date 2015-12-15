@@ -104,14 +104,14 @@ sudokuParser =
     cellParser :: Parser (Maybe Integer)
     cellParser =
         (\x -> case x of
-            '1' -> Just 1
-            '2' -> Just 2
-            '3' -> Just 3
-            '4' -> Just 4
-            '5' -> Just 5
-            '6' -> Just 6
-            '7' -> Just 7
-            '8' -> Just 8
-            '9' -> Just 9
+            '1' -> Just 0
+            '2' -> Just 1
+            '3' -> Just 2
+            '4' -> Just 3
+            '5' -> Just 4
+            '6' -> Just 5
+            '7' -> Just 6
+            '8' -> Just 7
+            '9' -> Just 8
             _ -> Nothing
         ) <$> anyChar
