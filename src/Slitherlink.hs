@@ -9,6 +9,8 @@ import Data.Maybe
 import Data.Map (Map, (!))
 import qualified Data.Map as Map
 import Data.SBV
+import Data.Set (Set)
+import qualified Data.Set as Set
 import Data.Tuple
 import Text.Printf
 
@@ -27,15 +29,22 @@ type SlitherlinkInst = [[Maybe Integer]]
     - The number of edges around a square with a number is that number.
     - The edges form a single connected cycle (difficult).
 
-    There will be two "solutions" returned for each solution: one for each orientation.
+    Encoding connectivity directly into the formula is very inefficient,
+    so we use an incremental solving method instead. When a solution with
+    multiple loops is returned, we add a clause with the negation of the
+    complete loops that are present. After some number of iterations, the
+    solution will have only one cycle.
 --}
 
 pairs :: [a] -> [(a, a)]
 pairs [] = []
 pairs (x:xs) = map ((,) x) xs ++ pairs xs
 
-rules :: SlitherlinkInst -> Symbolic SBool
-rules inst = do
+type Vertex = (Int, Int)
+type Edge = (Vertex, Vertex)
+
+rules :: SlitherlinkInst -> [[Edge]] -> Symbolic SBool
+rules inst badCycles = do
     let height = length inst
         width = length (head inst)
         edgeLocs =
@@ -68,16 +77,6 @@ rules inst = do
     edgeVars <- forM edgeLocs $ \e ->
         symbolic ("edge-" ++ show e)
     let edges = Map.fromList (zip edgeLocs edgeVars)
-    -- We use distances to determine if the cycle is connected.
-    -- The first edge will have a distance of 0, and then following
-    -- the cycle will increase the distance.
-    -- We will enforce the following properties, which together imply connectedness:
-    -- 1) If two edges are set, the distance for the later is strictly positive.
-    -- 2) For two set edges following each other, either the second distance is 0 or
-    --    one more than the first distance.
-    distVars <- forM edgeLocs $ \e ->
-        symbolic ("dist-" ++ show e) :: Symbolic SWord16
-    let dists = Map.fromList (zip edgeLocs distVars)
 
     addConstraints $ do
         -- An edge and its backedge cannot be set
@@ -125,28 +124,52 @@ rules inst = do
                         let vars = map (edges !) (edgesAround (r, c))
                         addConstraint $
                             sum (map (\v -> ite v 1 0) vars) .== literal n
-        -- If two edges are set, the distance for the later is strictly positive.
-        forM_ (pairs edgeLocs) $ \(e1, e2) -> do
-            let v1 = edges ! e1
-                v2 = edges ! e2
-                d1 = dists ! e1
-                d2 = dists ! e2
-            addConstraint $ (v1 &&& v2) ==> (d2 .> 0)
-        -- The distance for a set edge following another set edge is either 0 or one higher.
-        forM_ edgeLocs $ \e -> do
-            let t = snd e
-                outs = edgesOutOf t
-            forM_ outs $ \e' -> do
-                let v1 = edges ! e
-                    v2 = edges ! e'
-                    d1 = dists ! e
-                    d2 = dists ! e'
-                addConstraint $ (v1 &&& v2) ==> (d2 .== 0 ||| d2 .== d1 + 1)
-        -- If an edge is not set, its distance is -1
-        forM_ edgeLocs $ \e -> do
-            let v = edges ! e
-                d = dists ! e
-            addConstraint $ bnot v ==> d .== -1
+        -- Disallow any bad cycles that have shown up in the past.
+        forM_ badCycles $ \cyc -> do
+            let es = map (edges !) cyc
+            addConstraint $ bnot (bAnd es)
+
+cycles :: SlitherlinkInst -> Map Edge Bool -> [[Edge]]
+cycles inst sol =
+    fst $ foldl (\(cycs, vis) e ->
+        if not (sol ! e) || e `Set.member` vis
+        then (cycs, vis)
+        else
+            let (cyc', vis') = followCycle inst sol e vis
+            in (cyc':cycs, vis')
+    ) ([], Set.empty) edgeLocs
+    where
+    height = length inst
+    width = length (head inst)
+    edgeLocs =
+        [((r, c), (r, c+1)) | r <- [0..height], c <- [0..width-1]]
+        ++ [((r, c), (r, c-1)) | r <- [0..height], c <- [1..width]]
+        ++ [((r, c), (r+1, c)) | r <- [0..height-1], c <- [0..width]]
+        ++ [((r, c), (r-1, c)) | r <- [1..height], c <- [0..width]]
+
+followCycle :: SlitherlinkInst -> Map Edge Bool -> Edge -> Set Edge -> ([Edge], Set Edge)
+followCycle inst sol e visited =
+    go e [] visited
+    where
+    height = length inst
+    width = length (head inst)
+    neighborVerts (r, c) =
+        catMaybes
+            [ if r > 0 then Just (r-1, c) else Nothing
+            , if r < height then Just (r+1, c) else Nothing
+            , if c > 0 then Just (r, c-1) else Nothing
+            , if c < width then Just (r, c+1) else Nothing
+            ]
+    edgesOutOf v = [(v, v') | v' <- neighborVerts v]
+    go e acc vis =
+        if e `Set.member` vis
+        then
+            (reverse acc, vis)
+        else
+            case filter (sol !) (edgesOutOf (snd e)) of
+                [] -> error (printf "Edge %s without a following edge." (show e))
+                e':[] -> go e' (e:acc) (Set.insert e vis)
+                _ -> error "Edge with multiple following edges."
 
 getSolution :: SlitherlinkInst -> Map String CW -> String
 getSolution inst m =
@@ -175,17 +198,32 @@ getSolution inst m =
                     when (c /= width) $ tell " "
                 tell "\n"
 
-solvePuzzle :: Symbolic SBool -> (Map String CW -> a) -> IO [a]
-solvePuzzle prob fn = do
-    res <- allSat prob
-    return $ map fn (getModelDictionaries res)
+solvePuzzle :: SlitherlinkInst -> (Map String CW -> a) -> IO a
+solvePuzzle inst fn = go []
+    where
+    height = length inst
+    width = length (head inst)
+    edgeLocs =
+        [((r, c), (r, c+1)) | r <- [0..height], c <- [0..width-1]]
+        ++ [((r, c), (r, c-1)) | r <- [0..height], c <- [1..width]]
+        ++ [((r, c), (r+1, c)) | r <- [0..height-1], c <- [0..width]]
+        ++ [((r, c), (r-1, c)) | r <- [1..height], c <- [0..width]]
+    edgeName e = "edge-" ++ show e
+    go badCycs = do
+        let pred = rules inst badCycs
+        res <- sat pred
+        let m = getModelDictionary res
+            sol = Map.fromList (map (\e -> (e, fromCW (m ! edgeName e))) edgeLocs)
+            resCycles = cycles inst sol
+        case resCycles of
+            [] -> pure (fn (getModelDictionary res))
+            c:[] -> pure (fn (getModelDictionary res))
+            _ -> go (resCycles ++ badCycs)
 
 slitherlink :: SlitherlinkInst -> IO ()
 slitherlink puzzle = do
-    res <- solvePuzzle (rules puzzle) (getSolution puzzle)
-    printf "%d solution(s)\n" (length res)
-    forM_ res $ \soln ->
-        putStrLn soln
+    res <- solvePuzzle puzzle (getSolution puzzle)
+    putStrLn res
 
 -- Note that there needs to be an empty line to signal the end of the puzzle.
 slitherlinkParser :: Parser SlitherlinkInst
