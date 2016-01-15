@@ -3,6 +3,7 @@ module Main where
 import Sudoku
 import Battleship
 import PaintByNumbers
+import Slitherlink (SlitherlinkInst, slitherlink)
 
 sudokuEx :: [[Maybe Integer]]
 sudokuEx = map (map $ \c -> if c == '_' then Nothing else Just ((read [c]) - 1)) [
@@ -124,6 +125,16 @@ battleshipEx6 =
         colCounts = [1, 2, 2, 3, 0, 3, 1, 4, 0, 4]
     in (shipNums, grid, rowCounts, colCounts)
 
+slitherlinkEx :: SlitherlinkInst
+slitherlinkEx =
+    [ [Nothing, Nothing, Nothing, Nothing, Just 0, Nothing]
+    , [Just 3, Just 3, Nothing, Nothing, Just 1, Nothing]
+    , [Nothing, Nothing, Just 1, Just 2, Nothing, Nothing]
+    , [Nothing, Nothing, Just 2, Just 0, Nothing, Nothing]
+    , [Nothing, Just 1, Nothing, Nothing, Just 1, Just 1]
+    , [Nothing, Just 2, Nothing, Nothing, Nothing, Nothing]
+    ]
+
 battleShipCharToInput :: Char -> BattleshipInput
 battleShipCharToInput ' ' = NoInfo
 battleShipCharToInput '~' = Wavy
@@ -186,6 +197,8 @@ pbnEx2 = (
 
 main :: IO ()
 main = do
+    slitherlink slitherlinkEx
+    {-
     sudoku sudokuEx
 
     battleship battleshipEx1
@@ -197,3 +210,4 @@ main = do
 
     pbn pbnEx1
     pbn pbnEx2
+    -}

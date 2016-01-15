@@ -3,6 +3,11 @@
 
 module Battleship where
 
+import Control.Applicative
+import Control.Monad
+import Data.Attoparsec.ByteString (Parser)
+import Data.Attoparsec.ByteString.Char8
+import Data.Char (ord)
 import Data.SBV
 import Data.Generics
 import Data.List (transpose)
@@ -28,6 +33,7 @@ data BattleshipInput = Circle
                      | FaceDown
                      | Wavy
                      | NoInfo
+    deriving (Eq, Show, Ord)
 
 {-- Model of the space of Battleship solutions
     Each cell has a CellType: either empty, part of a horizontal ship, or part
@@ -263,3 +269,28 @@ battleship puzzle = do
     putStrLn $ (show $ length res) ++ " solution(s)"
     forM_ res $ \soln ->
         putStrLn $ soln
+
+-- Won't work for puzzles with 10+ ship tiles in a column
+battleshipParser :: Parser BattleshipInst
+battleshipParser = do
+    shipNums <- decimal `sepBy` (satisfy (\x -> isSpace x && x /= '\n'))
+    endOfLine
+    (grid, rowCounts) <- fmap unzip . many $ do
+        row <- many1 cellParser
+        skipSpace
+        rowCount <- decimal
+        endOfLine
+        return (row, rowCount)
+    colCounts <- many (subtract 48 . toInteger . ord <$> digit)
+    return (shipNums, grid, rowCounts, colCounts)
+    where
+    cellParser :: Parser BattleshipInput
+    cellParser =
+        char8 'o' *> pure Circle
+        <|> char8 'S' *> pure Square
+        <|> char8 '>' *> pure FaceLeft
+        <|> char8 '<' *> pure FaceRight
+        <|> char8 'v' *> pure FaceUp
+        <|> char8 '^' *> pure FaceDown
+        <|> char8 '~' *> pure Wavy
+        <|> char8 '.' *> pure NoInfo
