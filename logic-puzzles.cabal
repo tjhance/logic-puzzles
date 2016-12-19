@@ -51,7 +51,7 @@ executable logic-puzzles
   main-is:             Main.hs
   
   -- Modules included in this executable, other than Main.
-  -- other-modules:       Sudoku.hs
+  other-modules:       Sudoku, Battleship, PaintByNumbers, Slitherlink, Util
   
   -- LANGUAGE extensions used by modules in this package.
   -- other-extensions:    
@@ -73,6 +73,7 @@ executable logic-puzzles
   
 executable battleship
   main-is: Solvers/Battleship/Main.hs
+  other-modules: Battleship, Util
   build-depends:       base >= 4.8 && <4.9
                      , attoparsec >=0.13
                      , bytestring >=0.10
@@ -85,6 +86,7 @@ executable battleship
   
 executable slitherlink
   main-is: Solvers/Slitherlink/Main.hs
+  other-modules: Slitherlink, Util
   build-depends:       base >= 4.8 && <4.9
                      , attoparsec >=0.13
                      , bytestring >=0.10
@@ -97,6 +99,7 @@ executable slitherlink
 
 executable sudoku
   main-is: Solvers/Sudoku/Main.hs
+  other-modules: Sudoku, Util
   build-depends:       base >= 4.8 && <4.9
                      , attoparsec >=0.13
                      , bytestring >=0.10
@@ -109,6 +112,7 @@ executable sudoku
 
 executable nurikabe
   main-is: Solvers/Nurikabe/Main.hs
+  other-modules: Nurikabe, Util
   build-depends:       base >= 4.8 && <4.9
                      , array >= 0.5
                      , attoparsec >=0.13
