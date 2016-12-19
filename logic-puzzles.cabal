@@ -94,10 +94,23 @@ executable slitherlink
                      , syb >=0.6
   hs-source-dirs:      src
   default-language:    Haskell2010
-  
+
 executable sudoku
   main-is: Solvers/Sudoku/Main.hs
   build-depends:       base >= 4.8 && <4.9
+                     , attoparsec >=0.13
+                     , bytestring >=0.10
+                     , containers >=0.1
+                     , mtl >=2.2.1
+                     , sbv >=5.5
+                     , syb >=0.6
+  hs-source-dirs:      src
+  default-language:    Haskell2010
+
+executable nurikabe
+  main-is: Solvers/Nurikabe/Main.hs
+  build-depends:       base >= 4.8 && <4.9
+                     , array >= 0.5
                      , attoparsec >=0.13
                      , bytestring >=0.10
                      , containers >=0.1
