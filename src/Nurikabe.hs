@@ -38,9 +38,10 @@ import Util
 -- An instance of the puzzle is just a grid of numbers, some of which will have
 -- numbers.
 type NurikabeInst = [[Maybe Int]]
+type Wall = [(Int, Int)]
 
-rules :: NurikabeInst -> Symbolic SBool
-rules inst = do
+rules :: NurikabeInst -> [Wall] -> Symbolic SBool
+rules inst walls = do
     let height = length inst
     let width = length (head inst)
 
@@ -66,6 +67,14 @@ rules inst = do
 
         addConstraint $ (sum (map (\var -> ite var (literal 1) (literal 0)) (concat board))) .==
             literal numberSum
+
+        -- no 2x2 area of black cells
+        forM_ (zip board (tail board)) $ \(row1, row2) -> do
+            forM_ (zip (zip row1 (tail row1)) (zip row2 (tail row2))) $ \((cell1, cell2), (cell3, cell4)) ->
+                addConstraint $ cell1 ||| cell2 ||| cell3 ||| cell4
+
+        forM_ walls $ \wall ->
+            addConstraint $ bnot $ andList $ map (\(x, y) -> (board !! x) !! y) wall
 
 isOnePolyomino :: NurikabeInst -> [[SBool]] -> (Int, Int) -> [Polyomino] -> SBool
 isOnePolyomino inst board (x0, y0) polys =
@@ -146,19 +155,43 @@ polyominoEnumeration = map enumerate [0 .. ]
                 f = 2 + e - v
             in f == length boxes + 1
 
-isSetOfCellsConnected :: [(Int, Int)] -> Bool
-isSetOfCellsConnected [] = True
-isSetOfCellsConnected (coords@(firstCoord : _)) = runST $ do
+getWall :: [[Bool]] -> Maybe Wall
+getWall grid =
+    let blackCells = filter (\(x, y) -> not ((grid !! x) !! y))
+            [(x,y) | x <- [0 .. length grid - 1], y <- [0 .. length (head grid) - 1]]
+        (isBlackConnected, blackComponent) = isSetOfCellsConnected blackCells False
+
+        blackBorder = sort $ nub $ filter (\(x, y) -> x >= 0 && y >= 0 && x < length grid && y < length (head grid) && (grid !! x) !! y) (concat (map (\(x,y) -> [(x-1, y), (x+1, y), (x, y-1), (x, y+1)]) blackComponent))
+
+        -- since we sorted, it is guaranteed that the first element of blackBorder
+        -- is on the outer shell
+        (_, connectedWhiteComponent) = isSetOfCellsConnected blackBorder True
+    in
+        if isBlackConnected then
+            Nothing
+        else
+            --Just connectedWhiteComponent
+            Just blackBorder
+
+isSetOfCellsConnected :: [(Int, Int)] -> Bool -> (Bool, [(Int, Int)])
+isSetOfCellsConnected [] _ = (True, [])
+isSetOfCellsConnected (coords@(firstCoord : _)) includeDiagonals = runST $ do
     let minX = minimum $ map fst coords
     let minY = minimum $ map snd coords
     let maxX = maximum $ map fst coords
     let maxY = maximum $ map snd coords
     let bounds = ((minX, minY), (maxX, maxY))
 
+    let getAdjacents = if includeDiagonals then
+            \(x, y) -> [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1),
+                        (x - 1, y - 1), (x - 1, y + 1), (x + 1, y - 1), (x + 1, y + 1)]
+          else
+            \(x, y) -> [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)]
+
     let isOnArray = array bounds [((i, j), (i, j) `elem` coords) | i <- [minX .. maxX], j <- [minY .. maxY]]
     visitedArray <- array bounds <$> (mapM (\coord -> (coord,) <$> newSTRef False) [(i,j) | i <- [minX .. maxX], j <- [minY .. maxY]])
 
-    count <- newSTRef 1
+    count <- newSTRef [firstCoord]
     writeSTRef (visitedArray ! firstCoord) True
     l1 <- newSTRef [firstCoord]
     l2 <- newSTRef []
@@ -166,7 +199,8 @@ isSetOfCellsConnected (coords@(firstCoord : _)) = runST $ do
     whileTrue $ do
         l <- readSTRef l1
         let (x, y) = head l
-        forM_ [(x - 1, y), (x + 1, y), (x, y - 1), (x, y + 1)] $ \(x1, y1)-> do
+        writeSTRef l1 (tail l)
+        forM_ (getAdjacents (x, y)) $ \(x1, y1)-> do
             if x1 >= minX && x1 <= maxX && y1 >= minY && y1 <= maxY then
                 do
                     isAlreadyVisited <- readSTRef $ visitedArray ! (x1, y1)
@@ -177,7 +211,7 @@ isSetOfCellsConnected (coords@(firstCoord : _)) = runST $ do
                             writeSTRef l2 ((x1, y1) : l2')
                             writeSTRef (visitedArray ! (x1, y1)) True
                             count' <- readSTRef count
-                            writeSTRef count (count' + 1)
+                            writeSTRef count ((x1, y1) : count')
                     else
                         return ()
             else
@@ -195,7 +229,7 @@ isSetOfCellsConnected (coords@(firstCoord : _)) = runST $ do
         return $ not (l1' == [] && l2' == [])
 
     finalCount <- readSTRef count
-    return (finalCount == length coords)
+    return (length finalCount == length coords, finalCount)
 
 whileTrue :: Monad m => m Bool -> m ()
 whileTrue x = do
@@ -205,25 +239,36 @@ whileTrue x = do
     else
         return ()
 
-getSolution :: NurikabeInst -> Map String CW -> String
-getSolution puzzle m = concat $ map (++ "\n") $ map concat $
+solutionString :: [[Bool]] -> String
+solutionString grid = concat $ map (++ "\n") $ map concat $ map (map (\x -> if x then " " else ".")) grid
+
+getSolution :: NurikabeInst -> Map String CW -> [[Bool]]
+getSolution puzzle m =
     map (\i ->
         map (\j ->
-            if (fromCW $ m Data.Map.! ("cell-" ++ show i ++ "-" ++ show j) :: Bool) then
-                " "
-            else
-                "."
+            (fromCW $ m Data.Map.! ("cell-" ++ show i ++ "-" ++ show j) :: Bool)
         ) [0 .. length (head puzzle) - 1]
     ) [0 .. length puzzle - 1]
 
-solvePuzzle :: Symbolic SBool -> (Map String CW -> a) -> IO [a]
-solvePuzzle prob fn = do
-    res <- allSat prob
-    return $ map fn (getModelDictionaries res)
+solvePuzzle :: NurikabeInst -> IO [String]
+solvePuzzle inst = go []
+  where
+    go :: [Wall]-> IO [String]
+    go walls = do
+        --putStrLn $ "stuff" ++ "\n"
+        res <- sat (rules inst walls)
+        --putStrLn $ "stuff2" ++ "\n"
+        let soln = getSolution inst (getModelDictionary res)
+        --putStrLn $ "stuff3\n" ++ solutionString soln ++ "\n"
+        case getWall soln
+            of Nothing -> return $ [solutionString soln]
+               Just wall -> do
+                    putStrLn $ "got wall " ++ show wall
+                    go (wall : walls)
 
 nurikabe :: NurikabeInst -> IO ()
 nurikabe puzzle = do
-    res <- solvePuzzle (rules puzzle) (getSolution puzzle)
+    res <- solvePuzzle puzzle
     putStrLn $ (show $ length res) ++ " solutions(s)"
     forM_ res $ \soln ->
         putStrLn $ soln
