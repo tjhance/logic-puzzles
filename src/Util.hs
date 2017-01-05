@@ -11,3 +11,9 @@ addConstraints constraintAdder = do
 
 addConstraint :: SBool -> ConstraintAdder
 addConstraint x = tell [x]
+
+orList :: [SBool] -> SBool
+orList = foldl (|||) (literal False)
+
+andList :: [SBool] -> SBool
+andList = foldl (&&&) (literal True)
